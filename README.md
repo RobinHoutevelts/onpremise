@@ -73,7 +73,16 @@ You can't just go ahead and run the `./install.sh` command because the database-
 So we'll have to prepare things first.
 
  - `docker-compose build --force-rm`
+ - `docker volume create --name=sentry-postgres`
+ - `docker volume create --name=sentry-data`
+ - `docker volume create --name=sentry-redis`
+ - `docker volume create --name=sentry-zookeeper`
+ - `docker volume create --name=sentry-kafka`
+ - `docker volume create --name=sentry-kafka`
+ - `docker volume create --name=sentry-clickhouse`
+ - `docker volume create --name=sentry-symbolicator`
  - `docker-compose run postgres`
+ 
    - Since this is a fresh instance it won't have a database and will look for a dump in the `sentry-init-db`
       - If you messed up and need to run it again you'll have to remove the container volume and recreate it
         - `docker volume rm sentry-postgres`
@@ -81,7 +90,7 @@ So we'll have to prepare things first.
               - `docker container ls | grep sentry_onpremise_postgres`
               - `docker stop sentry_onpremise_postgres_run_xxx`
               - `docker container rm sentry_onpremise_postgres_run_xxx`
-        - `docker volume create --volume=sentry-postgres`
+        - `docker volume create --name=sentry-postgres`
    - You'll get a message saying 'database system is ready to accept connections' or smth like that
    - When done just `ctrl+c` out of there
    - It's possible you have a lingering container afterwards
