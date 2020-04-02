@@ -2,6 +2,10 @@
 
 Official bootstrap for running your own [Sentry](https://sentry.io/) with [Docker](https://www.docker.com/).
 
+### This is a [Wieni](https://www.wieni.be) fork. Use at own risk
+
+This fork uses postgres 10 because we ran Sentry 9.1.2 on it and had trouble downgrading our database 😅.
+
 ## Requirements
 
  * Docker 17.05.0+
@@ -60,6 +64,40 @@ and [Nginx](http://nginx.org/). You'll likely want to add this service to your `
 _You need to be on at least Sentry 9.1.2 to be able to upgrade automatically to the latest version. If you are not, upgrade to 9.1.2 first by checking out the [9.1.2 tag](https://github.com/getsentry/onpremise/tree/9.1.2) on this repo._
 
 The included `install.sh` script is meant to be idempotent and to bring you to the latest version. What this means is you can and should run `install.sh` to upgrade to the latest version available. Remember that the output of the script will be stored in a log file, `sentry_install_log-<ISO_TIMESTAMP>.txt`, which you may share for diagnosis if anything goes wrong.
+
+### Upgrade steps
+
+First you need to have a database dump ready and place it in the `sentry-init-db` directory.
+
+You can't just go ahead and run the `./install.sh` command because the database-container will take too long to bootstrap.
+So we'll have to prepare things first.
+
+ - `docker-compose build --force-rm`
+ - `docker-compose run postgres`
+   - Since this is a fresh instance it won't have a database and will look for a dump in the `sentry-init-db`
+      - If you messed up and need to run it again you'll have to remove the container volume and recreate it
+        - `docker volume rm sentry-postgres`
+           - It's possible this is still linked to a container, so stop and remove those first
+              - `docker container ls | grep sentry_onpremise_postgres`
+              - `docker stop sentry_onpremise_postgres_run_xxx`
+              - `docker container rm sentry_onpremise_postgres_run_xxx`
+        - `docker volume create --volume=sentry-postgres`
+   - You'll get a message saying 'database system is ready to accept connections' or smth like that
+   - When done just `ctrl+c` out of there
+   - It's possible you have a lingering container afterwards
+     - `docker ps | grep sentry_onpremise_postgres_run`
+     - Kill that too
+       - `docker stop sentry_onpremise_postgres_run_xxx`
+       - `docker container rm sentry_onpremise_postgres_run_xxx`
+
+Finally you are ready to run the `./install.sh` script.
+
+This can take a while 😅. It will run the upgrade script and perform any necessary migrations.
+But afterwards you'll be running v10 of Sentry 🥳
+
+## Handy commands:
+
+- `docker exec -it sentry_onpremise_postgres_1 pg_dump -U postgres postgres > db.sql`
 
 ## Resources
 
