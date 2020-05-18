@@ -110,10 +110,9 @@ But afterwards you'll be running v10 of Sentry 🥳
 
 ## Resources
 
- * [Documentation](https://docs.sentry.io/server/)
+ * [Documentation](https://docs.sentry.io/development/server/)
  * [Bug Tracker](https://github.com/getsentry/onpremise/issues)
- * [Forums](https://forum.sentry.io/c/on-premise)
- * [Discord](https://discord.gg/mg5V76F) (Sentry Community, #sentry-server)
+ * [Community Forums](https://forum.sentry.io/c/on-premise)
 
 
 [build-status-image]: https://api.travis-ci.com/getsentry/onpremise.svg?branch=master

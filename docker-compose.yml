@@ -15,6 +15,7 @@ x-sentry-defaults: &sentry_defaults
     - smtp
     - snuba-api
     - snuba-consumer
+    - snuba-outcomes-consumer
     - snuba-replacer
     - symbolicator
     - kafka
@@ -63,7 +64,7 @@ services:
       - './sentry-init-db:/docker-entrypoint-initdb.d'
   zookeeper:
     << : *restart_policy
-    image: 'confluentinc/cp-zookeeper:5.1.2'
+    image: 'confluentinc/cp-zookeeper:5.5.0'
     environment:
       ZOOKEEPER_CLIENT_PORT: '2181'
       CONFLUENT_SUPPORT_METRICS_ENABLE: 'false'
@@ -77,7 +78,7 @@ services:
     << : *restart_policy
     depends_on:
       - zookeeper
-    image: 'confluentinc/cp-kafka:5.1.2'
+    image: 'confluentinc/cp-kafka:5.5.0'
     environment:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
@@ -93,7 +94,7 @@ services:
       - 'sentry-secrets:/etc/kafka/secrets'
   clickhouse:
     << : *restart_policy
-    image: 'yandex/clickhouse-server:19.11'
+    image: 'yandex/clickhouse-server:19.17'
     ulimits:
       nofile:
         soft: 262144
@@ -103,12 +104,19 @@ services:
       - 'sentry-clickhouse-log:/var/log/clickhouse-server'
   snuba-api:
     << : *snuba_defaults
+  # Kafka consumer responsible for feeding events into Clickhouse
   snuba-consumer:
     << : *snuba_defaults
-    command: consumer --auto-offset-reset=latest --max-batch-time-ms 750
+    command: consumer --storage events --auto-offset-reset=latest --max-batch-time-ms 750
+  # Kafka consumer responsible for feeding outcomes into Clickhouse
+  # Use --auto-offset-reset=earliest to recover up to 7 days of TSDB data
+  # since we did not do a proper migration
+  snuba-outcomes-consumer:
+    << : *snuba_defaults
+    command: consumer --storage outcomes_raw --auto-offset-reset=earliest --max-batch-time-ms 750
   snuba-replacer:
     << : *snuba_defaults
-    command: replacer --auto-offset-reset=latest --max-batch-size 3
+    command: replacer --storage events --auto-offset-reset=latest --max-batch-size 3
   snuba-cleanup:
     << : *snuba_defaults
     image: snuba-cleanup-onpremise-local
@@ -135,14 +143,15 @@ services:
       - 'sentry-symbolicator:/data'
   web:
     << : *sentry_defaults
-    ports:
-      - '9000:9000/tcp'
   cron:
     << : *sentry_defaults
     command: run cron
   worker:
     << : *sentry_defaults
     command: run worker
+  ingest-consumer:
+    << : *sentry_defaults
+    command: run ingest-consumer --all-consumer-types
   post-process-forwarder:
     << : *sentry_defaults
     # Increase `--commit-batch-size 1` below to deal with high-load environments.
@@ -155,6 +164,30 @@ services:
       args:
         BASE_IMAGE: 'sentry-onpremise-local'
     command: '"0 0 * * * gosu sentry sentry cleanup --days $SENTRY_EVENT_RETENTION_DAYS"'
+  nginx:
+    << : *restart_policy
+    ports:
+      - '9000:80/tcp'
+    image: "nginx:1.16"
+    volumes:
+      - type: bind
+        read_only: true
+        source: ./nginx
+        target: /etc/nginx
+    depends_on:
+      - web
+      - relay
+  relay:
+    << : *restart_policy
+    image: "getsentry/relay:latest"
+    volumes:
+      - type: bind
+        read_only: true
+        source: ./relay
+        target: /work/.relay
+    depends_on:
+      - kafka
+      - redis
 volumes:
   sentry-data:
     external: true
